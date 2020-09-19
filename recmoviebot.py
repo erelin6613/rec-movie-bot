@@ -1,371 +1,131 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# This program is dedicated to the public domain under the CC0 license.
-
-"""
-First, a few callback functions are defined. Then, those functions are passed to
-the Dispatcher and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-Usage:
-Example of a bot-user conversation using nested ConversationHandlers.
-Send /start to initiate the conversation.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
 
 import os
-import logging
-
-from telegram import (InlineKeyboardMarkup, InlineKeyboardButton)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-													ConversationHandler, CallbackQueryHandler)
-
-# Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-										level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-
-# State definitions for top level conversation
-SELECTING_ACTION, ADDING_ACTOR, ADDING_GENRE, SELECT_POP = map(chr, range(4))
-# State definitions for second level conversation
-SELECTING_LEVEL, SELECTING_MOVIE = map(chr, range(4, 6))
-# State definitions for descriptions conversation
-SELECTING_FEATURE, TYPING = map(chr, range(6, 8))
-# Meta states
-STOPPING, SHOWING = map(chr, range(8, 10))
-# Shortcut for ConversationHandler.END
-END = ConversationHandler.END
-
-# Different constants for this example
-(ACTORS, GENRES, SELF, GENDER, MALE, FEMALE, AGE, NAME, START_OVER, FEATURES,
- CURRENT_FEATURE, CURRENT_LEVEL) = map(chr, range(10, 22))
-
-
-# Helper
-def _name_switcher(level):
-		if level == ACTORS:
-				return ('Favourite', 'Disliked')
-		elif level == GENRES:
-				return ('Most liked', 'Least liked')
-
-
-# Top level conversation callbacks
-def start(update, context):
-		"""Select an action: Adding parent/child or show data."""
-		text = 'You may add favourite actor, favourite genre show the gathered data or end the ' \
-					 'conversation. To abort, simply type /stop.'
-		buttons = [[
-				InlineKeyboardButton(text='Add favourite actor', callback_data=str(ADDING_ACTOR)),
-				InlineKeyboardButton(text='Add favourite genre', callback_data=str(ADDING_GENRE))
-		], [
-				InlineKeyboardButton(text='Show data', callback_data=str(SHOWING)),
-				InlineKeyboardButton(text='Done', callback_data=str(END))
-		]]
-		keyboard = InlineKeyboardMarkup(buttons)
-
-		# If we're starting over we don't need do send a new message
-		if context.user_data.get(START_OVER):
-				update.callback_query.answer()
-				update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-		else:
-				update.message.reply_text('Hi, I\'m RecMovieBot and here to help you gather information'
-																	'about your movie preferences. Later I can recommond you some.')
-				update.message.reply_text(text=text, reply_markup=keyboard)
-
-		context.user_data[START_OVER] = False
-		return SELECTING_ACTION
-
-
-def adding_genre(update, context):
-		"""Add information about youself."""
-		context.user_data[CURRENT_LEVEL] = SELF
-		text = 'Okay, please tell me about yourself.'
-		button = InlineKeyboardButton(text='Add info', callback_data=str(MALE))
-		keyboard = InlineKeyboardMarkup.from_button(button)
-
-		update.callback_query.answer()
-		update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-
-		return SELECT_POP
-
-
-def show_data(update, context):
-		"""Pretty print gathered data."""
-		def prettyprint(user_data, level):
-				people = user_data.get(level)
-				if not people:
-						return '\nNo information yet.'
-
-				text = ''
-				if level == SELF:
-						for person in user_data[level]:
-								text += '\nName: {}, Age: {}'.format(person.get(NAME, '-'), person.get(AGE, '-'))
-				else:
-						male, female = _name_switcher(level)
-
-						for person in user_data[level]:
-								gender = female if person[GENDER] == FEMALE else male
-								text += '\n{}: Name: {}, Age: {}'.format(gender, person.get(NAME, '-'),
-																												 person.get(AGE, '-'))
-				return text
-
-		ud = context.user_data
-		text = 'Yourself:' + prettyprint(ud, SELF)
-		text += '\n\nActors:' + prettyprint(ud, ACTORS)
-		text += '\n\nGenres:' + prettyprint(ud, GENRES)
-
-		buttons = [[
-				InlineKeyboardButton(text='Back', callback_data=str(END))
-		]]
-		keyboard = InlineKeyboardMarkup(buttons)
-
-		update.callback_query.answer()
-		update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-		ud[START_OVER] = True
-
-		return SHOWING
-
-
-def stop(update, context):
-		"""End Conversation by command."""
-		update.message.reply_text('Okay, bye.')
-
-		return END
-
-
-def end(update, context):
-		"""End conversation from InlineKeyboardButton."""
-		update.callback_query.answer()
-
-		text = 'See you around!'
-		update.callback_query.edit_message_text(text=text)
-
-		return END
-
-
-# Second level conversation callbacks
-def select_level(update, context):
-		"""Choose to add a parent or a child."""
-		text = 'You may add a parent or a child. Also you can show the gathered data or go back.'
-		buttons = [[
-				InlineKeyboardButton(text='Add actor', callback_data=str(ACTORS)),
-				InlineKeyboardButton(text='Add genre', callback_data=str(GENRES))
-		], [
-				InlineKeyboardButton(text='Show data', callback_data=str(SHOWING)),
-				InlineKeyboardButton(text='Back', callback_data=str(END))
-		]]
-		keyboard = InlineKeyboardMarkup(buttons)
-
-		update.callback_query.answer()
-		update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-
-		return SELECTING_LEVEL
-
-
-def select_gender(update, context):
-		"""Choose to add mother or father."""
-		level = update.callback_query.data
-		context.user_data[CURRENT_LEVEL] = level
-
-		text = 'Please choose, whom to add.'
-
-		male, female = _name_switcher(level)
-
-		buttons = [[
-				InlineKeyboardButton(text='Add ' + male, callback_data=str(MALE)),
-				InlineKeyboardButton(text='Add ' + female, callback_data=str(FEMALE))
-		], [
-				InlineKeyboardButton(text='Show data', callback_data=str(SHOWING)),
-				InlineKeyboardButton(text='Back', callback_data=str(END))
-		]]
-		keyboard = InlineKeyboardMarkup(buttons)
-
-		update.callback_query.answer()
-		update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-
-		return SELECTING_MOVIE
-
-
-def end_second_level(update, context):
-		"""Return to top level conversation."""
-		context.user_data[START_OVER] = True
-		start(update, context)
-
-		return END
-
-
-# Third level callbacks
-def select_feature(update, context):
-		"""Select a feature to update for the person."""
-		buttons = [[
-				InlineKeyboardButton(text='Name', callback_data=str(NAME)),
-				InlineKeyboardButton(text='Age', callback_data=str(AGE)),
-				InlineKeyboardButton(text='Done', callback_data=str(END)),
-		]]
-		keyboard = InlineKeyboardMarkup(buttons)
-
-		# If we collect features for a new person, clear the cache and save the gender
-		if not context.user_data.get(START_OVER):
-				context.user_data[FEATURES] = {GENDER: update.callback_query.data}
-				text = 'Please select a feature to update.'
-
-				update.callback_query.answer()
-				update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
-		# But after we do that, we need to send a new message
-		else:
-				text = 'Got it! Please select a feature to update.'
-				update.message.reply_text(text=text, reply_markup=keyboard)
-
-		context.user_data[START_OVER] = False
-		return SELECTING_FEATURE
-
-
-def ask_for_input(update, context):
-		"""Prompt user to input data for selected feature."""
-		context.user_data[CURRENT_FEATURE] = update.callback_query.data
-		text = 'Okay, tell me.'
-
-		update.callback_query.answer()
-		update.callback_query.edit_message_text(text=text)
-
-		return TYPING
-
-
-def save_input(update, context):
-		"""Save input for feature and return to feature selection."""
-		ud = context.user_data
-		ud[FEATURES][ud[CURRENT_FEATURE]] = update.message.text
-
-		ud[START_OVER] = True
-
-		return select_feature(update, context)
-
-
-def end_describing(update, context):
-		"""End gathering of features and return to parent conversation."""
-		ud = context.user_data
-		level = ud[CURRENT_LEVEL]
-		if not ud.get(level):
-				ud[level] = []
-		ud[level].append(ud[FEATURES])
-
-		# Print upper level menu
-		if level == SELF:
-				ud[START_OVER] = True
-				start(update, context)
-		else:
-				select_level(update, context)
-
-		return END
-
-
-def stop_nested(update, context):
-		"""Completely end conversation from within nested conversation."""
-		update.message.reply_text('Okay, bye.')
-
-		return STOPPING
-
-def list_commands(update, context):
-	update.message.reply_text(str(update.get_my_commands()))
-
-
-def main():
-		# Create the Updater and pass it your bot's token.
-		# Make sure to set use_context=True to use the new context based callbacks
-		# Post version 12 this will no longer be necessary
-		updater = Updater(os.environ.get('api_key'), use_context=True)
-
-		# Get the dispatcher to register handlers
-		dp = updater.dispatcher
-
-		# Set up third level ConversationHandler (collecting features)
-		description_conv = ConversationHandler(
-				entry_points=[CallbackQueryHandler(select_feature,
-																					 pattern='^' + str(MALE) + '$|^' + str(FEMALE) + '$')],
-
-				states={
-						SELECTING_FEATURE: [CallbackQueryHandler(ask_for_input,
-																										 pattern='^(?!' + str(END) + ').*$')],
-						TYPING: [MessageHandler(Filters.text & ~Filters.command, save_input)],
-				},
-
-				fallbacks=[
-						CallbackQueryHandler(end_describing, pattern='^' + str(END) + '$'),
-						CommandHandler('stop', stop_nested)
-				],
-
-				map_to_parent={
-						# Return to second level menu
-						END: SELECTING_LEVEL,
-						# End conversation alltogether
-						STOPPING: STOPPING,
-				}
-		)
-
-		# Set up second level ConversationHandler (adding a person)
-		add_member_conv = ConversationHandler(
-				entry_points=[CallbackQueryHandler(select_level,
-																					 pattern='^' + str(ADDING_ACTOR) + '$')],
-
-				states={
-						SELECTING_LEVEL: [CallbackQueryHandler(select_gender,
-																									 pattern='^{}$|^{}$'.format(str(ACTORS),
-																																							str(GENRES)))],
-						SELECTING_MOVIE: [description_conv]
-				},
-
-				fallbacks=[
-						CallbackQueryHandler(show_data, pattern='^' + str(SHOWING) + '$'),
-						CallbackQueryHandler(end_second_level, pattern='^' + str(END) + '$'),
-						CommandHandler('stop', stop_nested),
-						CommandHandler('help', list_commands)
-				],
-
-				map_to_parent={
-						# After showing data return to top level menu
-						SHOWING: SHOWING,
-						# Return to top level menu
-						END: SELECTING_ACTION,
-						# End conversation alltogether
-						STOPPING: END,
-				}
-		)
-
-		# Set up top level ConversationHandler (selecting action)
-		# Because the states of the third level conversation map to the ones of the econd level
-		# conversation, we need to make sure the top level conversation can also handle them
-		selection_handlers = [
-				add_member_conv,
-				CallbackQueryHandler(show_data, pattern='^' + str(SHOWING) + '$'),
-				CallbackQueryHandler(adding_genre, pattern='^' + str(ADDING_GENRE) + '$'),
-				CallbackQueryHandler(end, pattern='^' + str(END) + '$'),
-		]
-		conv_handler = ConversationHandler(
-				entry_points=[CommandHandler('start', start)],
-
-				states={
-						SHOWING: [CallbackQueryHandler(start, pattern='^' + str(END) + '$')],
-						SELECTING_ACTION: selection_handlers,
-						SELECTING_LEVEL: selection_handlers,
-						SELECT_POP: [description_conv],
-						STOPPING: [CommandHandler('start', start)],
-				},
-
-				fallbacks=[CommandHandler('stop', stop)],
-		)
-
-		dp.add_handler(conv_handler)
-
-		# Start the Bot
-		updater.start_polling()
-
-
-		# Run the bot until you press Ctrl-C or the process receives SIGINT,
-		# SIGTERM or SIGABRT. This should be used most of the time, since
-		# start_polling() is non-blocking and will stop the bot gracefully.
-		updater.idle()
+import pysnooper
+from telegram import (InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup)
+from telegram.ext import (Updater, CommandHandler, 
+	MessageHandler, Filters,ConversationHandler, CallbackQueryHandler)
+
+from scraper import get_listing_items
+
+d = {'typing_reply': 0, 'typing_choice': 1, 'choosing': 2}
+starting_buttons = [['Add actor', 'Add genre'],
+					['Trending movies', 'Show recommendations']]
+
+help_dict = {'/top': 'Show trending movies',
+			'/prefs': 'Display recorded preferences'}
+
+storage = {}
+storage['actor'] = []
+storage['genre'] = []
+
+@pysnooper.snoop()
+def greet(update, context):
+	markup = ReplyKeyboardMarkup(starting_buttons, one_time_keyboard=True)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text='I am a RecMovieBot, I can suggest you a new movies to watch.',
+		reply_markup=markup)
+
+@pysnooper.snoop()
+def display_help(update, context):
+	markup = ReplyKeyboardMarkup(starting_buttons, one_time_keyboard=True)
+	d = [x+':'+y for x, y in help_dict]
+	d = '\n'.join(d)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text=d,
+		reply_markup=markup)
+
+@pysnooper.snoop()
+def fallback(update, context):
+	markup = ReplyKeyboardMarkup(starting_buttons, one_time_keyboard=True)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text='See you around')
+
+@pysnooper.snoop()
+def get_top_movies(update, context):
+	movies = get_listing_items()
+	movies = '\n'.join([k+' - '+v for k, v in movies.items()])
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text=movies)
+
+@pysnooper.snoop()
+def show_users_prefs(update, context):
+	prefs = str(context.user_data)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text=prefs)
+
+@pysnooper.snoop()
+def regular_choice(update, context):
+	#print(update, context)
+	text = update.message.text.split(' ')[-1]
+	context.user_data['choice'] = text
+	update.message.reply_text(
+		'Your favourite {}? Yes, I would love to hear about that!'.format(text.lower()))
+
+	return d['typing_reply']
+
+@pysnooper.snoop()
+def received_information(update, context):
+	user_data = context.user_data
+	text = update.message.text
+	try:
+		category = user_data['choice']
+		user_data[category] = text
+		storage[category].append(text)
+
+		update.message.reply_text("Neat! Just so you know, this is what you already told me:"
+			"{} You can tell me more, or change your opinion"
+			" on something.".format(str(storage)))
+	except Exception as e:
+		update.message.reply_text("Did you choose something? I caught a hiccup")
+		print(e)
+
+	return d['choosing']
+
+
+def main(production=False):
+
+	#storage = init_storage()
+
+	updater = Updater(os.environ.get('api_key'), use_context=True)
+	dp = updater.dispatcher
+
+	greet_handler = MessageHandler(
+			(Filters.regex('(hi|Hi|hello|Hello)') & 
+			(~Filters.command)), greet)
+
+	#link_handler = CommandHandler('top', get_top_movies)
+	prefs_handler = CommandHandler('prefs', show_users_prefs)
+	help_handler = CommandHandler('help', show_users_prefs)
+
+	typing_reply_handler = MessageHandler(
+		(Filters.regex('Add genre|Add actor')), regular_choice)
+	typing_choice_handler = MessageHandler(
+		(Filters.text) & (~Filters.command) & (~Filters.regex('Trending movies')), 
+		received_information)
+	top_movies_handler = MessageHandler(
+		(Filters.regex('Trending movies')), get_top_movies)
+	f_handler = MessageHandler((Filters.regex('bye')), fallback)
+
+	dp.add_handler(prefs_handler)
+	dp.add_handler(help_handler)
+	dp.add_handler(greet_handler)
+	dp.add_handler(typing_reply_handler)
+	dp.add_handler(typing_choice_handler)
+	dp.add_handler(top_movies_handler)
+	dp.add_handler(f_handler)
+	#dp.add_handler(conv_handler)
+
+	if production:
+		updater.start_webhook(listen='0.0.0.0',
+								port=int(os.environ.get('PORT')),
+								url_path=os.environ.get('api_key'))
+		updater.bot.setWebhook(
+			"https://recmoviebot.herokuapp.com/{}".format(os.environ.get('api_key')))
+	updater.start_polling()
+	updater.idle()
 
 
 if __name__ == '__main__':
-		main()
+	main(production=True)
