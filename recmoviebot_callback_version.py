@@ -25,6 +25,9 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+
+# Define helpers and boilerplate
+
 d = {'typing_reply': 0, 'typing_choice': 1, 'choosing': 2}
 
 screens = OrderedDict({'start': 100,
@@ -95,12 +98,27 @@ def error_handler(update, context):
 # @pysnooper.snoop()
 def greet(update, context):
 	"""Greeting handler. Greet a user and display starting layout."""
-	markup = ReplyKeyboardMarkup(
-		starting_buttons, one_time_keyboard=True)
+
+	buttons = [[
+		#InlineKeyboardButton(text='Add an actor', callback_data=str(actor_choice)),
+		#InlineKeyboardButton(text=screen_texts[0], callback_data=str(regular_choice)),
+		InlineKeyboardButton(text=screen_texts[3], callback_data=str(screens['trending'])),
+		InlineKeyboardButton(text=screen_texts[10], callback_data=str(screens['my_profile']))
+
+	]]
+	keyboard = InlineKeyboardMarkup(buttons)
+	#print(update.callback_query)
+	#update.callback_query.answer()
 	update.message.reply_text(
 		text='I am a RecMovieBot, I can suggest you a new movies to watch.',
+		reply_markup=keyboard)
+	"""
+	markup = ReplyKeyboardMarkup(
+		starting_buttons, one_time_keyboard=True)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text='I am a RecMovieBot, I can suggest you a new movies to watch.',
 		reply_markup=markup)
-
+	"""
 	return d['choosing']
 
 @pysnooper.snoop()
@@ -108,6 +126,8 @@ def show_profile(update, context):
 	"""Greeting handler. Greet a user and display starting layout."""
 
 	buttons = [[
+		#InlineKeyboardButton(text='Add an actor', callback_data=str(actor_choice)),
+		#InlineKeyboardButton(text=screen_texts[0], callback_data=str(regular_choice)),
 		InlineKeyboardButton(text=screen_texts[1], callback_data=str(screens['add_actor'])),
 		InlineKeyboardButton(text=screen_texts[2], callback_data=str(screens['add_genre']))],
 		[InlineKeyboardButton(text=screen_texts[12], callback_data=str(screens['my_prefs'])),
@@ -115,10 +135,19 @@ def show_profile(update, context):
 
 	]]
 	keyboard = InlineKeyboardMarkup(buttons)
+	#print(update.callback_query)
+	#update.callback_query.answer()
 	text = 'okay, here is your profile dashboard'
 	update.callback_query.answer()
 	print('show_profile called')
 	update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
+	"""
+	markup = ReplyKeyboardMarkup(
+		starting_buttons, one_time_keyboard=True)
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text='I am a RecMovieBot, I can suggest you a new movies to watch.',
+		reply_markup=markup)
+	"""
 	return d['typing_choice']
 
 # @pysnooper.snoop()
@@ -178,11 +207,12 @@ def basic_recommendations(update, context):
 		results_buttons, one_time_keyboard=True)
 
 	if 'genre' in list(context.user_data.keys()):
-		genre = context.user_data['genre'][-1]
-		genre = fix_sentence(genre, 'genre')
+		genre = context.user_data['genre'][0]
+		genre = fix_sentence(genre)
 		movies = scrape_by_genre(genre)
 		m = '\n'.join(['{}. {} - {}'.format(
 			i+1, k, movies[k]) for i, k in enumerate(movies)])
+		#m = '\n'.join([k+' - '+v for k, v in movies.items()])
 		context.bot_data['last_recomendation'] = movies 
 		context.bot.send_message(
 			chat_id=update.effective_chat.id, 
@@ -190,8 +220,9 @@ def basic_recommendations(update, context):
 			reply_markup=markup)
 
 	elif 'actor' in list(context.user_data.keys()):
-		actor = context.user_data['actor'][-1]
+		actor = context.user_data['actor'][0]
 		movies = scrape_by_cast(actor)
+		#m = '\n'.join([k+' - '+v for k, v in movies.items()])
 		m = '\n'.join(['{}. {} - {}'.format(
 			i+1, k, movies[k]) for i, k in enumerate(movies)])
 		context.bot_data['last_recomendation'] = movies 
@@ -222,11 +253,20 @@ def regular_choice(update, context):
 	"""Given a choice user made store it in
 	the user_data dictionary to use it later."""
 
-	text = update.message.text.split(' ')[-1]
-	context.user_data['choice'] = text
-	update.message.reply_text(
-		'Your favourite {}? Sure, go ahead and type it!'.format(
-			text.lower()))
+	ind = int(update.callback_query.data) % 100
+	vocab_name = screen_texts[ind].split('_')[-1]
+	data = get_vocab(vocab_name)[:8]
+	#context.user_data['choice'] = text
+	buttons = [
+		[InlineKeyboardButton(text=data[x], callback_data=str(150+x)) for x in range(2)],
+		[InlineKeyboardButton(text=data[x+2], callback_data=str(152+x)) for x in range(2)],
+		[InlineKeyboardButton(text=data[x+4], callback_data=str(154+x)) for x in range(2)],
+		[InlineKeyboardButton(text=data[x+6], callback_data=str(156+x)) for x in range(2)]
+	]
+	keyboard = InlineKeyboardMarkup(buttons)
+	text = 'Here are the most popular {} people look for'.format(vocab_name)
+	update.callback_query.answer()
+	update.callback_query.edit_message_text(text=text, reply_markup=keyboard)
 
 	return d['typing_reply']
 
@@ -258,6 +298,8 @@ def received_information(update, context):
 
 
 def get_list_choice(update, context):
+	#update.message.reply_text('')
+	#num = update.message.text
 
 	context.user_data['list_choice'] = context.callback_query.data #int(num)-1
 	#return 
@@ -283,6 +325,12 @@ def add_to_watchlist(update, context):
 		assert len(context.user_data['watch_list']) != 0
 	except Exception:
 		context.user_data['watch_list'] = {}
+	#print(context.user_data['watch_list'])
+	#print(movies)
+	#choice = context.user_data['list_choice']
+	#context.user_data['watch_list'][movies_buttons[choice]] = list(movies.values())[choice]
+	#context.user_data['list_choice'] = None
+	#update.message.reply_text('Which one?')
 	print(context.chat_data)
 
 	for k, v in movies.items():
@@ -321,14 +369,36 @@ def main(production=False):
 		use_context=True)
 	dp = updater.dispatcher
 
-	greet_handler = MessageHandler(
-			(Filters.regex(start_regex) & 
-			(~Filters.command)), greet)
+	#greet_handler = MessageHandler(
+	#		(Filters.regex(start_regex) & 
+	#		(~Filters.command)), greet)
 
 	prefs_handler = CommandHandler('prefs', show_users_prefs)
 	help_handler = CommandHandler('help', show_users_prefs)
 	start_handler = CommandHandler('start', greet)
 
+	greet_handler = CallbackQueryHandler(
+		CallbackQueryHandler, pattern='hi')
+
+	top_movies_handler = CallbackQueryHandler(
+		get_top_movies, pattern=str(screens['trending']))
+	profile_handler = CallbackQueryHandler(
+		show_profile, pattern=str(screens['my_profile']))
+
+	add_actor_handler = CallbackQueryHandler(
+		regular_choice, pattern=str(screens['add_actor']))
+	add_genre_handler = CallbackQueryHandler(
+		regular_choice, pattern=str(screens['add_genre']))
+	back_handler = CallbackQueryHandler(
+		# for now we will return just to starting screen
+		greet, pattern=str(screens['start']))
+
+	#screen_choice_handler = CallbackQueryHandler(regular_choice, pattern=str())
+	"""
+	top_movies_handler = CallbackQueryHandler(
+		get_top_movies, pattern=str(screens['trending']))
+	basic_rec_handler = CallbackQueryHandler(
+		basic_recommendations, pattern=str(screens['recs']))
 	typing_reply_handler = MessageHandler(
 		(Filters.regex('{}|{}'.format(buttons[0], buttons[1]))),
 		regular_choice)
@@ -347,6 +417,8 @@ def main(production=False):
 	display_list_add_handler = MessageHandler(
 		(Filters.regex(buttons[7])), display_watch_list)
 
+
+	#list_choice_handler = MessageHandler(Filters.regex('[0-9]'), get_list_choice)
 	list_choice_handler = CallbackQueryHandler(get_list_choice, pattern='[0-9]')
 	f_handler = MessageHandler((Filters.regex('bye')), fallback)
 
@@ -361,6 +433,18 @@ def main(production=False):
 	dp.add_handler(watch_list_add_handler)
 	dp.add_handler(display_list_add_handler)
 	dp.add_handler(f_handler)
+	"""
+
+	dp.add_handler(prefs_handler)
+	dp.add_handler(help_handler)
+	dp.add_handler(start_handler)
+	dp.add_handler(top_movies_handler)
+	dp.add_handler(profile_handler)
+	dp.add_handler(add_actor_handler)
+	dp.add_handler(add_genre_handler)
+	dp.add_handler(back_handler)
+	#dp.add_handler(basic_rec_handler)
+	dp.add_error_handler(error_handler)
 
 	if production:
 		updater.start_webhook(listen='0.0.0.0',
@@ -374,4 +458,4 @@ def main(production=False):
 
 
 if __name__ == '__main__':
-	main(production=True)
+	main(production=False)

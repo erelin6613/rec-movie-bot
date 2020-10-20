@@ -1,6 +1,7 @@
 import requests
 import pysnooper
 from bs4 import BeautifulSoup
+from collections import OrderedDict
 
 imdb_url = 'https://www.imdb.com'
 item_class = 'lister-item-content'
@@ -61,16 +62,16 @@ def scrape_by_cast(person):
 		return None
 	r = requests.get(actor_link)
 	soup = BeautifulSoup(r.text, 'lxml')
-	items = search_list(soup, op=op)
+	items = search_list(soup)
 	return items
 
 # @pysnooper.snoop()
-def get_listing_items(num_items=10):
+def get_listing_items(num_items=5):
 	"""Colect movie names and links for popular ones"""
 	text = get_link('chart/moviemeter')
 	soup = BeautifulSoup(text, 'lxml')
 	items = search_list(soup)
-	return items
+	return OrderedDict(items)
 
 # @pysnooper.snoop()
 def get_link(extension=None):

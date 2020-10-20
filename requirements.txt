@@ -10,8 +10,10 @@ idna==2.10
 joblib==0.16.0
 lxml==4.5.2
 nltk==3.5
+numpy==1.19.2
 pycparser==2.20
 PySnooper==0.4.2
+pyTelegramBotAPI==3.7.3
 python-telegram-bot==12.8
 regex==2020.7.14
 requests==2.24.0
