@@ -60,3 +60,9 @@ target/
 .idea/
 
 api_key.txt
+movielens_latest/links.csv
+movielens_latest/movies.csv
+movielens_latest/ratings.csv
+movielens_latest/tags.csv
+movielens_latest/README.txt
+movielens_latest/rec_vec_df.csv

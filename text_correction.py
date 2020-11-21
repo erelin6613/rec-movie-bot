@@ -5,7 +5,6 @@ import argparse
 import sys
 import re
 
-
 def define_paths(root_dir):
 
 	vocabs = {'genre': os.path.join(

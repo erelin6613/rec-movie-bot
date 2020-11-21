@@ -9,7 +9,7 @@ import logging
 import traceback
 from collections import OrderedDict
 from telegram import (InlineKeyboardMarkup, 
-	InlineKeyboardButton, ReplyKeyboardMarkup, Poll)
+	InlineKeyboardButton, ReplyKeyboardMarkup, Poll, Sticker)
 from telegram.ext import (Updater, CommandHandler, 
 	MessageHandler, Filters,ConversationHandler, 
 	CallbackQueryHandler, DictPersistence)
@@ -17,18 +17,19 @@ from telegram.ext import (Updater, CommandHandler,
 from scraper import *
 from text_correction import fix_sentence
 from utils import get_vocab
+from moviebase import MovieBase
 
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
-    level=logging.INFO)
+	format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+	level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
 d = {'typing_reply': 0, 'typing_choice': 1, 'choosing': 2}
 
 screens = OrderedDict({'start': 100,
-			'add_actor': 101,
+			'how_work': 101,
 			'add_genre': 102,
 			'trending':103,
 			'recs': 104,
@@ -45,56 +46,58 @@ screen_texts, screen_nums = list(
 	screens.keys()), list(screens.values())
 # print(screens, screen_texts, screen_nums)
 
-buttons = ['Add actor', 'Add genre', 'Trending movies', 
+buttons = ['How does it work?', 'Add genre', 'Trending movies', 
 		'Show recommendations', 'Add to watch later', 
-		'Review watched', 'To the starting page', 
+		'Add favourite movie', 'To the starting page', 
 		'My watch list', 'Manage my preferences']
 
-starting_buttons = [[buttons[0], buttons[1]],
+starting_buttons = [[buttons[5], buttons[1]],
 					[buttons[2], buttons[3]]]
 
 results_buttons = [[buttons[4], buttons[5]],
 					[buttons[6], buttons[7]]]
 
 help_dict = {'/top': 'Show trending movies',
-			'/prefs': 'Display recorded preferences'}
+			'/prefs': 'Display recorded preferences',
+			'/about': 'Information about RecMovieBot'}
 
-start_regex = '(hi|Hi|hello|Hello|To the starting page)'
+start_regex = '(hi|Hi|hello|Hello|To the starting page)(\s|$)'
 
 
 def error_handler(update, context):
-    """Log the error and send a telegram message to notify the developer."""
-    # Log the error before we do anything else, so we can see it even if something breaks.
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+	"""Log the error and send a telegram message to notify the developer."""
+	# Log the error before we do anything else, so we can see it even if something breaks.
+	logger.error(msg="Exception while handling an update:", exc_info=context.error)
 
-    # traceback.format_exception returns the usual python message about an exception, but as a
-    # list of strings rather than a single string, so we have to join them together.
-    tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
-    tb = ''.join(tb_list)
+	# traceback.format_exception returns the usual python message about an exception, but as a
+	# list of strings rather than a single string, so we have to join them together.
+	tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+	tb = ''.join(tb_list)
 
-    # Build the message with some markup and additional information about what happened.
-    # You might need to add some logic to deal with messages longer than the 4096 character limit.
-    message = (
-        'An exception was raised while handling an update\n'
-        'update = {}\n\n'
-        'context.chat_data = {}\n\n'
-        'context.user_data = {}\n\n'
-        '{}'
-    ).format(
-        html.escape(json.dumps(update.to_dict(), indent=2, ensure_ascii=False)),
-        html.escape(str(context.chat_data)),
-        html.escape(str(context.user_data)),
-        html.escape(tb),
-    )
+	# Build the message with some markup and additional information about what happened.
+	# You might need to add some logic to deal with messages longer than the 4096 character limit.
+	message = (
+		'An exception was raised while handling an update\n'
+		'update = {}\n\n'
+		'context.chat_data = {}\n\n'
+		'context.user_data = {}\n\n'
+		'{}'
+	).format(
+		html.escape(json.dumps(update.to_dict(), indent=2, ensure_ascii=False)),
+		html.escape(str(context.chat_data)),
+		html.escape(str(context.user_data)),
+		html.escape(tb),
+	)
 
-    print(message)
+	print(message)
 
-    # Finally, send the message
-    #context.bot.send_message(chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML)
+	# Finally, send the message
+	#context.bot.send_message(chat_id=DEVELOPER_CHAT_ID, text=message, parse_mode=ParseMode.HTML)
 
 # @pysnooper.snoop()
 def greet(update, context):
 	"""Greeting handler. Greet a user and display starting layout."""
+	context.bot_data['moviebase'] = MovieBase()
 	markup = ReplyKeyboardMarkup(
 		starting_buttons, one_time_keyboard=True)
 	update.message.reply_text(
@@ -103,12 +106,12 @@ def greet(update, context):
 
 	return d['choosing']
 
-@pysnooper.snoop()
+#@pysnooper.snoop()
 def show_profile(update, context):
 	"""Greeting handler. Greet a user and display starting layout."""
 
 	buttons = [[
-		InlineKeyboardButton(text=screen_texts[1], callback_data=str(screens['add_actor'])),
+		InlineKeyboardButton(text=screen_texts[1], callback_data=str(screens['how_work'])),
 		InlineKeyboardButton(text=screen_texts[2], callback_data=str(screens['add_genre']))],
 		[InlineKeyboardButton(text=screen_texts[12], callback_data=str(screens['my_prefs'])),
 		InlineKeyboardButton(text=screen_texts[11], callback_data=str(screens['back']))
@@ -127,7 +130,7 @@ def display_help(update, context):
 	markup = ReplyKeyboardMarkup(
 		starting_buttons, one_time_keyboard=True)
 
-	d = [x+':'+y for x, y in help_dict]
+	d = [x+': '+y for x, y in help_dict.items()]
 	d = '\n'.join(d)
 
 	context.bot.send_message(chat_id=update.effective_chat.id, 
@@ -144,7 +147,15 @@ def fallback(update, context):
 	context.bot.send_message(chat_id=update.effective_chat.id, 
 		text='See you around')
 
-@pysnooper.snoop()
+def explain(update, context):
+	explain_file = os.path.dirname(__file__)
+	explain_file = os.path.join(explain_file, 'knowledge_base', 'explain.txt')
+	with open(explain_file) as f:
+		text = f.read()
+	context.bot.send_message(chat_id=update.effective_chat.id, 
+		text=text)
+
+#@pysnooper.snoop()
 def get_top_movies(update, context):
 	"""Display popular movies in the format
 	name - link. 10 movies are showed if found.
@@ -156,13 +167,74 @@ def get_top_movies(update, context):
 
 	movies = get_listing_items()
 	#m = '\n'.join([k+' - '+v for k, v in movies.items()])
-	m = '\n'.join(['{}. {} - {}'.format(
-		i+1, k, movies[k]) for i, k in enumerate(movies)])
+	movies = context.bot_data['moviebase'].get_top_rated()
+	message = ''
+	for i, mId in enumerate(movies.index):
+		message = message+str(
+			i+1)+'. '+movies.loc[mId, 'title']+'-'+movies.loc[mId, 'imdbUrl']+'\n'
 	context.bot_data['last_recomendation'] = movies 
 
 	context.bot.send_message(
 		chat_id=update.effective_chat.id, 
-		text=m,
+		text=message,
+		reply_markup=markup)
+
+	return screens['my_wl']
+
+def review_movie(update, context):
+
+	context.user_data['choice'] = 'reviewed'
+	update.message.reply_text(
+		'What movie did you like? Type the name of it, will see if I know it')
+
+	return d['typing_reply']
+
+def one_to_watchlist(update, context):
+
+	context.user_data['choice'] = 'watch_list'
+	update.message.reply_text(
+		'What movie should I add there? Type the name of it and I will add it')
+
+	return d['typing_reply']
+
+def recs_by_genre(update, context):
+	pass
+
+def smart_recommendations(update, context):
+
+	markup = ReplyKeyboardMarkup(
+		results_buttons, one_time_keyboard=True)
+
+	if 'reviewed' in context.user_data.keys():
+		context.bot.send_message(
+			chat_id=update.effective_chat.id, 
+			text='Searching best movies ...',
+			reply_markup=markup)
+
+		titles = context.user_data['reviewed']
+		#print(titles)
+		movies = context.bot_data['moviebase'].get_by_reviewed(titles)
+	elif 'genre' in context.user_data.keys():
+		movies = context.bot_data['moviebase'].get_top_rated(
+			genre=context.user_data['genre'])
+	#elif 'to_watchlist' in context.user_data.keys():
+
+		#pass
+	else:
+		context.bot.send_message(
+			chat_id=update.effective_chat.id, 
+			text='Ehm, I do not know anything you like? Want to review a movie?',
+			reply_markup=markup)
+		return screens['my_wl']
+	message = ''
+	for i, mId in enumerate(movies.index):
+		message = message+str(
+			i+1)+'. '+movies.loc[mId, 'title']+'-'+movies.loc[mId, 'imdbUrl']+'\n'
+	context.bot_data['last_recomendation'] = movies 
+
+	context.bot.send_message(
+		chat_id=update.effective_chat.id, 
+		text=message,
 		reply_markup=markup)
 
 	return screens['my_wl']
@@ -235,16 +307,69 @@ def received_information(update, context):
 	"""Store user's preferences."""
 	user_data = context.user_data
 	text = update.message.text
-	markup = ReplyKeyboardMarkup(
-		starting_buttons, one_time_keyboard=True)
+
 	try:
+		print(user_data)
 		category = user_data['choice']
+		if category == 'reviewed':
+			markup = ReplyKeyboardMarkup(
+				starting_buttons, one_time_keyboard=True)
+
+			movie = context.bot_data['moviebase'].lookup_movie(text)
+
+			if movie is None:
+				message = 'I do not know this one, sorry :('
+				context.user_data['reviewed'].pop(title)
+			else:
+				movie_title, movie_url, movie_id = movie[0], movie[1], movie[2]
+				message = "Ah, this one {} Okay, I noted it.".format(movie_url)
+
+			update.message.reply_text(
+				message,
+				reply_markup=markup)
+			try:
+				assert len(user_data[category]) != 0
+				user_data[category].append(movie_title)
+			except Exception:
+				user_data[category] = [movie_title]
+			print(user_data)
+			del user_data['choice']
+
+			return d['choosing']
+
+		elif category == 'watch_list':
+			markup = ReplyKeyboardMarkup(
+				results_buttons, one_time_keyboard=True)
+			movie = context.bot_data['moviebase'].lookup_movie(text)
+
+			if movie is None:
+				message = 'I do not know this one, sorry :('
+				# context.user_data['reviewed'].pop(title)
+			else:
+				movie_title, movie_url, movie_id = movie[0], movie[1], movie[2]
+				message = "Great! {} is added to your watchlist.".format(movie_title)
+
+			update.message.reply_text(
+				message,
+				reply_markup=markup)
+			try:
+				assert len(user_data[category]) != 0
+				user_data[category].append(movie_title)
+			except Exception:
+				user_data[category] = [movie_title]
+			print(user_data)
+			del user_data['choice']
+
+			return d['choosing']
+
 		try:
 			assert len(user_data[category]) != 0
 			user_data[category].append(text)
 		except Exception:
 			user_data[category] = [text]
 		del user_data['choice']
+		markup = ReplyKeyboardMarkup(
+			starting_buttons, one_time_keyboard=True)
 
 		update.message.reply_text(
 			"Neat! I added that to your preferences.",
@@ -275,6 +400,7 @@ def add_to_watchlist(update, context):
 	markup = ReplyKeyboardMarkup(
 		starting_buttons, one_time_keyboard=True)
 	movies = context.bot_data['last_recomendation']
+	#print(movies)
 	movies_buttons = [[x] for x in movies.keys()]
 	markup_choice = ReplyKeyboardMarkup(
 		movies_buttons, one_time_keyboard=True)
@@ -307,14 +433,20 @@ def display_watch_list(update, context):
 		return d['choosing']
 
 	movies = context.user_data['watch_list']
-	m = '\n'.join([k+' - '+v for k, v in movies.items()])
-	context.bot_data['last_recomendation'] = movies 
+	titles = movies #['title']
+	links = context.bot_data['moviebase'].dataset #movies['imdbUrl']
+	
+	#print(links[links.title==titles[0]]['imdbUrl'])
+	links = [links[links.title==x]['imdbUrl'].values[0] for x in titles]
+	#print(movies)
+	m = '\n'.join([movie+' - '+link for movie, link in zip(titles, links)])
+	#context.bot_data['last_recomendation'] = movies 
 	context.bot.send_message(
 		chat_id=update.effective_chat.id, 
 		text=m,
 		reply_markup=markup)
 
-@pysnooper.snoop()
+#@pysnooper.snoop()
 def main(production=False):
 
 	updater = Updater(os.environ.get('api_key'), 
@@ -326,12 +458,19 @@ def main(production=False):
 			(~Filters.command)), greet)
 
 	prefs_handler = CommandHandler('prefs', show_users_prefs)
-	help_handler = CommandHandler('help', show_users_prefs)
+	help_handler = CommandHandler('help', display_help)
 	start_handler = CommandHandler('start', greet)
+	about_handler = CommandHandler('about', explain)
 
 	typing_reply_handler = MessageHandler(
-		(Filters.regex('{}|{}'.format(buttons[0], buttons[1]))),
+		(Filters.regex('{}'.format(buttons[1]))),
 		regular_choice)
+	review_movie_handler = MessageHandler(
+		(Filters.regex('{}'.format(buttons[5]))),
+		review_movie)
+	one_to_watchlist_handler = MessageHandler(
+		(Filters.regex('{}'.format(buttons[4]))),
+		one_to_watchlist)
 	typing_choice_handler = MessageHandler(
 		(Filters.text) & (~Filters.command) & (~Filters.regex(
 			'|'.join([x for x in buttons]))), 
@@ -339,11 +478,11 @@ def main(production=False):
 
 	top_movies_handler = MessageHandler(
 		(Filters.regex(buttons[2])), get_top_movies)
-	basic_rec_handler = MessageHandler(
-		(Filters.regex(buttons[3])), basic_recommendations)
+	recommendation_handler = MessageHandler(
+		(Filters.regex(buttons[3])), smart_recommendations)
 
-	watch_list_add_handler = MessageHandler(
-		(Filters.regex(buttons[4])), add_to_watchlist)
+	#watch_list_add_handler = MessageHandler(
+	#	(Filters.regex(buttons[4])), add_to_watchlist)
 	display_list_add_handler = MessageHandler(
 		(Filters.regex(buttons[7])), display_watch_list)
 
@@ -352,14 +491,17 @@ def main(production=False):
 
 	dp.add_handler(prefs_handler)
 	dp.add_handler(help_handler)
+	dp.add_handler(about_handler)
 	dp.add_handler(greet_handler)
+	dp.add_handler(review_movie_handler)
 	dp.add_handler(list_choice_handler)
 	dp.add_handler(typing_reply_handler)
 	dp.add_handler(typing_choice_handler)
 	dp.add_handler(top_movies_handler)
-	dp.add_handler(basic_rec_handler)
-	dp.add_handler(watch_list_add_handler)
+	dp.add_handler(recommendation_handler)
+	dp.add_handler(one_to_watchlist_handler)
 	dp.add_handler(display_list_add_handler)
+	
 	dp.add_handler(f_handler)
 
 	if production:
@@ -374,4 +516,4 @@ def main(production=False):
 
 
 if __name__ == '__main__':
-	main(production=True)
+	main(production=False)

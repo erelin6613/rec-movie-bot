@@ -1,0 +1,5 @@
+I am a RecMovieBot, the purpose of mine is to help you explore new movies you might like. My creator set up the system to recommend movies based on movies you have seen and liked or based on your favorite genres.
+
+The main source of information I have (at this time at least) is the latest small version of MovieLens Dataset (https://grouplens.org/datasets/movielens/latest/). If you want genre-based recommendation I will give you movies rated the highest in this dataset.
+
+If you want movie-based recommendation my creator set me up to run simple version of Collaborative Filtering (https://en.wikipedia.org/wiki/Collaborative_filtering). In simple words, I look for a users who also liked those movies you do. Full-blown version of this algorithm would require much more work and resources, so I hope you enjoy my recommendations nevertheless.
