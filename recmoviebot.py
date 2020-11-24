@@ -184,9 +184,9 @@ def get_top_movies(update, context):
 		by = by.split(' ')[-1]
 
 		if by=='genre' and 'genre' in context.user_data.keys():
-			movies = context.bot_data['moviebase'].get_top_rated(genre=context.user_data['genre'][0])
+			movies = context.bot_data['moviebase'].get_top_rated(genre=context.user_data['genre'])
 		elif by=='actor' and 'actor' in context.user_data.keys():
-			movies = context.bot_data['moviebase'].get_top_rated(actor=context.user_data['actor'][0])
+			movies = context.bot_data['moviebase'].get_top_rated(actor=context.user_data['actor'])
 		else:
 			markup = ReplyKeyboardMarkup(
 				add_pref_buttons, 
@@ -250,6 +250,7 @@ def smart_recommendations(update, context):
 		titles = context.user_data['reviewed']
 		movies = context.bot_data['moviebase'].get_by_reviewed(titles)
 	elif 'genre' in context.user_data.keys():
+		#print('goes to algo', context.user_data['genre'])
 		movies = context.bot_data['moviebase'].get_top_rated(
 			genre=context.user_data['genre'])
 
@@ -355,7 +356,7 @@ def received_information(update, context):
 				user_data[category].append(movie_title)
 			except Exception:
 				user_data[category] = [movie_title]
-			print(user_data)
+			#print(user_data)
 			del user_data['choice']
 
 			return d['choosing']
@@ -363,7 +364,8 @@ def received_information(update, context):
 		try:
 			assert len(user_data[category]) != 0
 			user_data[category].append(text)
-		except Exception:
+		except Exception as e:
+			#print(e)
 			user_data[category] = [text]
 		del user_data['choice']
 		markup = ReplyKeyboardMarkup(
@@ -377,7 +379,7 @@ def received_information(update, context):
 	except Exception as e:
 		update.message.reply_text(
 			"Please specify the command first")
-		print(e)
+		#print(e)
 
 	return d['choosing']
 

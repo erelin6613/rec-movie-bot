@@ -38,12 +38,21 @@ class MovieBase:
 
 	def get_top_rated(self, genre=None, actor=None, num=10):
 		if genre is not None:
-			print(genre)
-			top = self.dataset[self.dataset.genres.str.contains(
-				genre, regex=False, case=False)].sort_values('averageRating')[-num:]
+			top = pd.DataFrame()
+			for g in genre:
+				g_df = self.dataset[self.dataset.genres.str.contains(
+					g, regex=False, case=False)]
+				top = top.append(g_df, ignore_index=True)
+			top = top.sort_values('averageRating')[-num:]
+
 		elif actor is not None:
-			top = self.dataset[self.dataset.actors.str.contains(
-				actor, regex=False, case=False)].sort_values('averageRating')[-num:]
+			top = pd.DataFrame()
+			for g in actor:
+				g_df = self.dataset[self.dataset.actors.str.contains(
+					g, regex=False, case=False)]
+				top = top.append(g_df, ignore_index=True)
+			top = top.sort_values('averageRating')[-num:]
+
 		else:
 			top = self.dataset.sort_values('averageRating')[-num:]
 		if len(top)>num:
