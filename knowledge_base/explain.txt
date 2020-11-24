@@ -1,6 +1,6 @@
 I am a RecMovieBot, the purpose of mine is to help you explore new movies you might like. My creator set up the system to recommend movies based on movies you have seen and liked or based on your favorite genres and actors.
 
-The main source of information I have is open IMDB Database (more information is available here https://www.imdb.com/interfaces). Surely, my creator dstiled massive database to much smaller one (checkout a GitHub repo for source and research code https://github.com/erelin6613/rec-movie-bot/tree/content_recommendation). If you want genre-based recommendation I will give you movies rated the highest in this dataset with this genre. Actor? No problem!
+The main source of information I have is open IMDB Database (more information is available here https://www.imdb.com/interfaces). Surely, my creator distiled massive database to much smaller one (checkout a GitHub repo for source and research code https://github.com/erelin6613/rec-movie-bot/tree/content_recommendation). If you want genre-based recommendation I will give you movies rated the highest in this dataset with this genre. Actor? No problem!
 
 If you want movie-based recommendation my creator set me up to run simple version of Content-Based Filtering (https://en.wikipedia.org/wiki/Recommender_system#Content-based_filtering). In simple words, I represent each movie as a vector of some machine-understandable features (year, genre, country etc) and find you the closest once as my suggestions (https://en.wikipedia.org/wiki/Cosine_similarity).
 
